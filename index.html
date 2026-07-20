@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weintour 2027</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        body { background-color: #f8fafc; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased font-sans p-4 max-w-2xl mx-auto mb-12">
+
+    <!-- SCREEN 1: LOGIN -->
+    <div id="screen-login" class="mt-20 text-center">
+        <h1 class="text-4xl font-bold mb-8 text-rose-800">🍷 Weintour 2027</h1>
+        <input type="password" id="login-password" class="border-2 border-slate-200 p-3 rounded-lg w-full max-w-xs text-center mb-4 focus:border-rose-500 outline-none" placeholder="Passwort eingeben">
+        <br>
+        <button onclick="checkPassword()" class="bg-rose-700 text-white font-bold px-8 py-3 rounded-lg shadow-md hover:bg-rose-800 transition-colors">Eintreten</button>
+        <p id="login-error" class="text-red-500 mt-4 hidden font-medium">Falsches Passwort!</p>
+    </div>
+
+    <!-- SCREEN 2: WER BIST DU? -->
+    <div id="screen-user" class="hidden mt-20 text-center">
+        <h2 class="text-3xl font-bold mb-8 text-slate-700">Wer bist du?</h2>
+        <div class="grid grid-cols-2 gap-4 max-w-sm mx-auto" id="user-buttons"></div>
+    </div>
+
+    <!-- SCREEN 3: DASHBOARD / VOTING -->
+    <div id="screen-voting" class="hidden mt-4">
+        <div class="flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+            <div>
+                <h2 class="text-xl font-bold text-slate-800">Reiseziele 2027</h2>
+                <p class="text-sm text-gray-500">Bitte favorisierte Unterkünfte wählen</p>
+            </div>
+            <div class="text-right">
+                <span id="current-user-display" class="bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-sm font-bold"></span>
+                <button onclick="logout()" class="block mt-1 text-xs text-gray-400 hover:text-gray-600 underline">Wechseln</button>
+            </div>
+        </div>
+        
+        <div id="voting-content" class="space-y-8"></div>
+
+        <!-- WHATSAPP BUTTON -->
+        <div class="mt-12 text-center">
+            <button onclick="shareViaWhatsApp()" class="bg-green-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-green-700 transition-colors flex items-center justify-center mx-auto gap-2">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                Ergebnis in WhatsApp teilen
+            </button>
+        </div>
+    </div>
+
+    <!-- LOGIK -->
+    <script>
+        // ==========================================
+        // 1. FIREBASE KONFIGURATION
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDouSkMnmWFFGHVIrhFLgQzjbz6FOjozrM",
+            authDomain: "weintour-2027.firebaseapp.com",
+            databaseURL: "https://weintour-2027-default-rtdb.europe-west1.firebasedatabase.app", // Wichtig für europäische Server!
+            projectId: "weintour-2027",
+            storageBucket: "weintour-2027.firebasestorage.app",
+            messagingSenderId: "649275327465",
+            appId: "1:649275327465:web:59e4acb476cc8cf0748178"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // ==========================================
+        // 2. DATEN & EINSTELLUNGEN
+        // ==========================================
+        const SECRET_PW = "ichwillsaufenderhahnmusslaufen";
+        const USERS = ["Berti", "Dome", "König", "Radi", "Schmelle"];
+        
+        const DESTINATIONS = [
+            {
+                id: 'traben_trarbach',
+                name: 'Traben-Trarbach (Moselweinfestival)',
+                date: '08.07. - 11.07.2027',
+                desc: 'Moselweinfestival (09.07 - 12.07.). Wir bleiben 3 Nächte (Do-So).',
+                accommodations: [
+                    { id: 'tt_1', name: 'Schloss "Schieferjuwel"', price: '260€ p.P.', info: 'Laufen: 15 Min | Taxi: 3 Min | 2 Parkplätze (1.300€ gesamt)', link: 'https://www.airbnb.de/rooms/1068724269386987167' },
+                    { id: 'tt_2', name: 'Waldhaus zum gechillten Hirsch', price: '240€ p.P.', info: 'Laufen: 30 Min | Taxi: 5 Min | 3 Parkplätze (1.200€ gesamt)', link: 'https://www.airbnb.de/rooms/1633305849326598377' },
+                    { id: 'tt_3', name: 'Staymosel Ferienwohnungen', price: '186€ p.P.', info: 'Laufen: 15 Min | Taxi: 3 Min | Keine Parkplätze (930€ für 2 Wohnungen)', link: 'https://www.booking.com/Share-1q37zgg' },
+                    { id: 'tt_4', name: 'Moselhäuschen by Interhome', price: '112€ p.P.', info: 'Laufen: 15 Min | Taxi: 3 Min | Parkplatz vorhanden (558€ gesamt)', link: 'https://www.booking.com/Share-Ic7ts6' }
+                ]
+            },
+            {
+                id: 'cochem',
+                name: 'Cochem (Heimat- & Weinfestival)',
+                date: '26.08. - 29.08.2027',
+                desc: 'Heimat- und Weinfestival (26.08 - 30.08.). Wir bleiben 3 Nächte (Do-So).',
+                note: 'Da Portale wie Airbnb und Booking ihre Kalender oft erst genau 1 Jahr im Voraus freischalten, ist die volle Auswahl aktuell noch nicht buchbar. Weitere Angebote folgen im August!',
+                accommodations: [
+                    { id: 'co_1', name: 'Komplettes Haus im Zentrum', price: '400€ p.P.', info: 'Laufen: 10 Min | Taxi: 8 Min | Parkplatz: Keine Info (2.000€ gesamt)', link: 'https://www.airbnb.de/rooms/1595301404585023140' },
+                    { id: 'co_2', name: 'FeWoMo Panorama Loft', price: '360€ p.P.', info: 'Laufen: 20 Min | Taxi: 5 Min | 1 Parkplatz (1.800€ gesamt)', link: 'https://www.booking.com/Share-1EGJfL4' }
+                ]
+            },
+            {
+                id: 'bernkastel',
+                name: 'Bernkastel-Kues (Weinfest der Mittelmosel)',
+                date: '02.09. - 06.09.2027',
+                desc: 'Größtes Weinfest an der Mosel (02.09 - 06.09.). Wir bleiben 3 Nächte (Do-So).',
+                note: 'Da Portale wie Airbnb und Booking ihre Kalender oft erst genau 1 Jahr im Voraus freischalten, ist die volle Auswahl aktuell noch nicht buchbar. Weitere Angebote folgen im September!',
+                accommodations: [
+                    { id: 'bk_1', name: 'Moselblick•Sauna•E-Bikes inkl. Velo&Wohnen Cube', price: '330€ p.P.', info: 'Laufen: Nicht möglich | Auto: 25 Min | Parkplatz: Keine Info (1.650€ gesamt)', link: 'https://www.airbnb.de/rooms/1082643273399819540' }
+                ]
+            }
+        ];
+
+        let currentUser = localStorage.getItem('wt27_user') || null;
+        
+        // Die Daten kommen jetzt aus der Cloud
+        let votes = {};
+        let customIdeas = {};
+
+        // ==========================================
+        // 3. LOGIK & NAVIGATION
+        // ==========================================
+        function initApp() {
+            const hasAuth = localStorage.getItem('wt27_auth');
+            if (!hasAuth) {
+                showScreen('screen-login');
+            } else if (!currentUser) {
+                renderUserSelection();
+                showScreen('screen-user');
+            } else {
+                startMainApp();
+            }
+        }
+
+        function showScreen(screenId) {
+            document.getElementById('screen-login').classList.add('hidden');
+            document.getElementById('screen-user').classList.add('hidden');
+            document.getElementById('screen-voting').classList.add('hidden');
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function checkPassword() {
+            if (document.getElementById('login-password').value === SECRET_PW) {
+                localStorage.setItem('wt27_auth', 'true');
+                document.getElementById('login-error').classList.add('hidden');
+                initApp();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+
+        function renderUserSelection() {
+            const container = document.getElementById('user-buttons');
+            container.innerHTML = '';
+            USERS.forEach(user => {
+                const btn = document.createElement('button');
+                btn.className = "bg-white border-2 border-slate-200 p-4 rounded-xl shadow-sm hover:border-rose-500 font-bold text-slate-700 transition-colors";
+                btn.innerText = user;
+                btn.onclick = () => {
+                    currentUser = user;
+                    localStorage.setItem('wt27_user', user);
+                    startMainApp();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function logout() {
+            localStorage.removeItem('wt27_auth');
+            localStorage.removeItem('wt27_user');
+            currentUser = null;
+            document.getElementById('login-password').value = '';
+            initApp();
+        }
+
+        function startMainApp() {
+            document.getElementById('current-user-display').innerText = currentUser;
+            showScreen('screen-voting');
+            
+            // FIREBASE LISTENER: Aktualisiert die Seite live
+            db.ref('weintour2027/votes').on('value', (snapshot) => {
+                votes = snapshot.val() || {};
+                renderVotingBoard();
+            });
+
+            db.ref('weintour2027/customIdeas').on('value', (snapshot) => {
+                customIdeas = snapshot.val() || {};
+                renderVotingBoard();
+            });
+        }
+
+        function renderVotingBoard() {
+            const container = document.getElementById('voting-content');
+            let html = '';
+
+            DESTINATIONS.forEach(dest => {
+                html += `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 p-4 border-b border-slate-200">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-xl font-bold text-slate-800">${dest.name}</h3>
+                            <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded flex-shrink-0 ml-2">${dest.date}</span>
+                        </div>
+                        <p class="text-sm text-slate-600">${dest.desc}</p>
+                    </div>
+                    <div class="p-4 space-y-3">
+                `;
+
+                // Standard + Eigene Vorschläge
+                const destCustoms = customIdeas[dest.id] ? Object.values(customIdeas[dest.id]) : [];
+                const allAccommodations = [...dest.accommodations, ...destCustoms];
+
+                if (allAccommodations.length > 0) {
+                    html += `<h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Unterkünfte zur Wahl</h4>`;
+                    
+                    allAccommodations.forEach(acc => {
+                        const voters = votes[acc.id] || [];
+                        const hasVoted = voters.includes(currentUser);
+                        const btnClass = hasVoted 
+                            ? "bg-rose-600 text-white hover:bg-rose-700" 
+                            : "bg-slate-100 text-slate-700 hover:bg-slate-200";
+                        const btnText = hasVoted ? "✓ Meine Wahl" : "Dafür stimmen";
+                        
+                        const titleHtml = acc.link && acc.link !== '#'
+                            ? `<a href="${acc.link}" target="_blank" class="hover:text-rose-600 underline decoration-rose-200 underline-offset-4">${acc.name}</a>`
+                            : acc.name;
+
+                        html += `
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 rounded-xl border ${hasVoted ? 'border-rose-300 bg-rose-50' : 'border-slate-100'}">
+                                <div class="mb-3 sm:mb-0 w-full sm:w-2/3">
+                                    <div class="font-bold text-slate-800">
+                                        ${titleHtml}
+                                        ${acc.price ? `<span class="font-normal text-slate-500 ml-1">(${acc.price})</span>` : ''}
+                                    </div>
+                                    <div class="text-xs text-slate-500 mt-1">${acc.info}</div>
+                                    ${voters.length > 0 ? `<div class="text-xs mt-2 text-rose-600 font-medium bg-rose-100 inline-block px-2 py-0.5 rounded">Stimmen: ${voters.join(', ')}</div>` : ''}
+                                </div>
+                                <button onclick="toggleVote('${acc.id}')" class="${btnClass} px-4 py-2 rounded-lg text-sm font-bold transition-colors w-full sm:w-auto flex-shrink-0">
+                                    ${btnText}
+                                </button>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<div class="p-4 text-sm text-slate-500 italic text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">Noch keine Unterkünfte vorhanden.</div>`;
+                }
+
+                if (dest.note) {
+                    html += `
+                        <div class="mt-4 mb-2 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl">
+                            💡 <strong>Hinweis:</strong> ${dest.note}
+                        </div>
+                    `;
+                }
+
+                html += `
+                        <div class="mt-4 pt-4 border-t border-slate-100">
+                            <h5 class="text-xs font-bold text-slate-400 uppercase mb-3">Eigenen Vorschlag einreichen</h5>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="text" id="custom-name-${dest.id}" placeholder="Name / kurze Info" class="flex-1 border border-slate-300 p-2 rounded-lg text-sm outline-none focus:border-rose-500">
+                                <input type="text" id="custom-link-${dest.id}" placeholder="Link (optional)" class="flex-1 border border-slate-300 p-2 rounded-lg text-sm outline-none focus:border-rose-500">
+                                <button onclick="addCustomIdea('${dest.id}')" class="bg-slate-200 text-slate-700 hover:bg-slate-300 px-4 py-2 rounded-lg text-sm font-bold transition-colors">Hinzufügen</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function toggleVote(accommodationId) {
+            let currentVotes = votes[accommodationId] || [];
+            const index = currentVotes.indexOf(currentUser);
+            
+            if (index > -1) {
+                currentVotes.splice(index, 1);
+            } else {
+                currentVotes.push(currentUser);
+            }
+            
+            // Speichert die Stimme direkt in der Cloud!
+            db.ref('weintour2027/votes/' + accommodationId).set(currentVotes);
+        }
+
+        function addCustomIdea(destId) {
+            const nameInput = document.getElementById(`custom-name-${destId}`);
+            const linkInput = document.getElementById(`custom-link-${destId}`);
+            
+            if (!nameInput.value.trim()) {
+                alert("Bitte zumindest einen Namen oder eine kurze Info eingeben!");
+                return;
+            }
+
+            const newId = 'custom_' + Date.now();
+            const newIdea = {
+                id: newId,
+                name: nameInput.value + ` (Vorschlag von ${currentUser})`,
+                price: '',
+                info: 'Eigener Vorschlag',
+                link: linkInput.value || '#'
+            };
+
+            // Speichert den eigenen Vorschlag direkt in der Cloud!
+            db.ref('weintour2027/customIdeas/' + destId + '/' + newId).set(newIdea);
+
+            nameInput.value = '';
+            linkInput.value = '';
+        }
+
+        function shareViaWhatsApp() {
+            let text = "🍷 *Weintour 2027 - Zwischenstand*\n\n";
+            let totalVotes = 0;
+
+            DESTINATIONS.forEach(dest => {
+                let destText = "";
+                const destCustoms = customIdeas[dest.id] ? Object.values(customIdeas[dest.id]) : [];
+                const allAccommodations = [...dest.accommodations, ...destCustoms];
+                
+                allAccommodations.forEach(acc => {
+                    const voters = votes[acc.id] || [];
+                    if (voters.length > 0) {
+                        destText += `- ${acc.name}: ${voters.length} Stimme(n) (${voters.join(', ')})\n`;
+                        totalVotes++;
+                    }
+                });
+
+                if (destText !== "") text += `📍 *${dest.name}*\n` + destText + `\n`;
+            });
+
+            if (totalVotes === 0) {
+                alert("Noch keine Stimmen abgegeben!");
+                return;
+            }
+
+            text += "Abstimmen unter: https://deinedomain.github.io/weintour-2027"; // Passe diesen Link an, sobald deine GitHub Page online ist!
+
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        // Start
+        initApp();
+    </script>
+</body>
+</html>
